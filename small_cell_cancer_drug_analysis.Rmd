@@ -8,9 +8,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-
-```{r, warning=F, echo = F}
-## Load CTRP drug data
+Load CTRP drug data
+```{r, warning=F}
 aucs <- read.delim('~/Downloads/CTRPv2.2_2015_pub_CancerDisc_5_1210/v22.data.auc_sensitivities.txt', stringsAsFactors = F)
 drug.labels <- read.delim('~/Downloads/CTRPv2.2_2015_pub_CancerDisc_5_1210/v22.meta.per_compound.txt', stringsAsFactors = F)
 cell.labels <- read.delim('~/Downloads/CTRPv2.2_2015_pub_CancerDisc_5_1210/v22.meta.per_cell_line.txt', stringsAsFactors = F)
@@ -23,8 +22,8 @@ sc.index <- lung.sc$index_ccl
 ```
 
 
-```{r,warning=F,echo=F}
-#Perform u-tests
+Perform Mann-Whitney u-tests
+```{r,warning=F}
 pvalues = NULL
 for (i in 1:max(aucs$index_cpd)) {
   temp <- aucs[aucs$index_cpd == i,]
@@ -53,20 +52,8 @@ pvalues <- pvalues[order(-pvalues$log_pvalue),]
 write.table(pvalues, file = 'CTRP_results.txt', quote = F, sep = '\t', row.names = F)
 ```
 
-### CTRP more effective in adenocarcinoma
-```{r, echo = F}
-knitr::kable(head(g.pvalues, 20))
-head(g.pvalues,20)
-```
-
-### CTRP more effective in small cell
-```{r, echo = F}
-knitr::kable(head(l.pvalues, 20))
-```
-
-
-```{r,warning=F, echo = F}
-#Load data from pharmacogenomic landscape paper
+Load data from pharmacogenomic landscape paper
+```{r,warning=F}
 aucs <- read.csv('~/Downloads/aucs.csv', stringsAsFactors = F, skip = 3, header = F)
 aucs <- aucs[c(1,3:nrow(aucs)),]
 
@@ -85,9 +72,8 @@ cpd.annot <- cpd.annot[,-1]
 ```
 
 
-
-```{r,warning=F, echo = F}
-#Perform u-tests for AUCs
+Perform u-tests for AUCs
+```{r,warning=F}
 pvalues = NULL
 auc.sc <- aucs[aucs$V1 %in% sc.idx,]
 auc.ad <- aucs[aucs$V1 %in% ad.idx,]
@@ -121,18 +107,9 @@ pvalues <- pvalues[order(-pvalues$log_pvalue),]
 write.table(pvalues, file = 'Iorio_results.txt', quote = F, sep = '\t', row.names = F)
 ```
 
-### 2016 Cell paper more effective in adenocarcinoma
-```{r, echo = F}
-knitr::kable(head(g.auc.pvals, 20))
-```
 
-### 2016 Cell paper more effective in small cell
-```{r, echo = F}
-knitr::kable(head(l.auc.pvals, 20))
-```
-
+Perform t-test for IC50s
 ```{r,warning=F, echo = F}
-#Perform t-test for IC50s
 ic50.pvals = NULL
 ic50.sc <- ic50s[ic50s$V1 %in% sc.idx,]
 ic50.ad <- ic50s[ic50s$V1 %in% ad.idx,]
@@ -160,13 +137,3 @@ ic50.pvals <- ic50.pvals[order(ic50.pvals$index),]
 ic50.pvals <- data.frame(ic50.pvals,cpd_name = cpd.annot$Name, target = cpd.annot$Putative.Target, pathway = cpd.annot$Targeted.process.pathway)
 ic50.pvals <- ic50.pvals[order(-ic50.pvals$log_pvalue),]
 ```
-
-
-###small cell cross group comparison
-```{r}
-ctrp <- read.delim('~/CTRP_results.txt', stringsAsFactors = F)
-iorio <- read.delim('~/Iorio_results.txt', stringsAsFactors = F)
-
-
-```
-
