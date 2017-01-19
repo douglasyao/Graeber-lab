@@ -1,0 +1,186 @@
+---
+title: "Small cell single cell RNA-seq"
+output: html_notebook
+---
+
+Load signatures for each specific cell type. Taken from Garraway paper.
+
+```{r}
+cell.annot <- read.csv('~/Downloads/aad0501_Table_S3.csv', stringsAsFactors = F)
+all.annot <- list()
+for (i in 1:ncol(cell.annot)) {
+  temp <- cell.annot[,i]
+  temp <- gsub('\'','',temp)
+  temp <- temp[!temp == '']
+  all.annot[[colnames(cell.annot)[i]]] <- temp
+}
+```
+
+
+Load average small cell signature.
+
+```{r}
+### Given a directory of .rnk files, creates average signature of all .rnk files by taking the average of each gene.
+# |dir| is a directory of .rnk files
+# |collapse| if set to True, will only return genes that are found in all files. If False, will include all genes. Genes that are 
+# not found in a particular .rnk file will be indicated with NA. The average will be the average of all non-NA values. 
+# |ranked| if set to True, will average genes by relative rank in their respective lists. Otherwise will average genes by their metric.
+# OUTPUT: A data frame containing all metric/rank data for all .rnk files, with genes on rows and .rnk file names on columns. The rightmost column will have the average metric/rank. 
+get_ave_sig <- function(dir, collapse = F, ranked = F) {
+  files <- list.files(dir, pattern = '.rnk')
+  names <- gsub('.rnk','',files)
+  allgenes = list()
+  for (i in 1:length(files)) {
+    temp <- read.delim(paste0(dir,'/',files[i]), row.names = 1, stringsAsFactors = F)
+    temp <- temp[order(-temp),,drop = F]
+    allgenes[[i]] <- temp
+  }
+  if (collapse == T) {
+    common <- Reduce(intersect,lapply(allgenes, function(x) rownames(x)))
+    allgenes.common <- data.frame(row.names = common)
+    for (i in 1:length(allgenes)) {
+      temp <- allgenes[[i]]
+      temp <- temp[rownames(temp) %in% common,,drop = F]
+      if (ranked == T) temp[,1] <- 1:nrow(temp)
+      temp <- temp[common,,drop = F]
+      allgenes.common <- cbind(allgenes.common, temp)
+    }
+    allgenes.common <- data.frame(allgenes.common, ave = rowMeans(allgenes.common))
+  }
+  if (collapse == F) {
+    common <- unique(unlist(lapply(allgenes, function(x) rownames(x))))
+    allgenes.common <- data.frame(row.names = common)
+    for (i in 1:length(allgenes)) {
+      temp <- allgenes[[i]]
+      dif <- common[!common %in% rownames(temp)]
+      if (ranked == T) temp[,1] <- 1:nrow(temp)
+      temp2 <- data.frame(rep(NA, length(dif)), row.names = dif)
+      colnames(temp2) <- colnames(temp)
+      temp <- rbind(temp, temp2)
+      temp <- temp[common,,drop = F]
+      allgenes.common <- cbind(allgenes.common, temp)
+    }    
+    allgenes.common <- data.frame(allgenes.common, ave = rowMeans(allgenes.common, na.rm = T))
+  }
+  if (ranked == T) allgenes.common <- allgenes.common[order(allgenes.common$ave),]
+  else if (ranked == F) allgenes.common <- allgenes.common[order(-allgenes.common$ave),]
+  colnames(allgenes.common) <- c(names,'ave')
+  return (allgenes.common)
+}
+  
+avesig <- get_ave_sig('~/Documents/small_cell/')
+avesig$gene <- as.character(avesig$gene)
+
+
+temp <- get_ave_sig('/Volumes/data0/users/dyao/viper_small_cell_rnk_files/')
+write.table(temp,'/Volumes/data0/users/dyao/average_viper.txt', sep = '\t', quote = F, col.names = NA)
+
+
+combine_viper <- function(dir) {
+  files <- list.files(dir, pattern = 'msviper')
+  names <- gsub('_msviper.txt','',files)
+  allgenes = list()
+  for (i in 1:length(files)) {
+    temp <- read.delim(paste0(dir,'/',files[i]), row.names = 1, stringsAsFactors = F)
+    temp <- temp[,-1]
+    allgenes[[i]] <- temp
+  }
+  common <- unique(unlist(lapply(allgenes, function(x) rownames(x))))
+  allgenes.common <- data.frame(row.names = common)
+  for (i in 1:length(allgenes)) {
+    temp <- allgenes[[i]]
+    dif <- common[!common %in% rownames(temp)]
+    temp2 <- data.frame(rep(NA, length(dif)), rep(NA, length(dif)), rep(NA, length(dif)), row.names = dif)
+    colnames(temp2) <- colnames(temp)
+    temp <- rbind(temp, temp2)
+    temp <- temp[common,,drop = F]
+    allgenes.common <- cbind(allgenes.common, temp)
+  }
+  colnames(allgenes.common) <- paste(rep(names, each = 3), colnames(allgenes.common), sep = '.')
+  allgenes.common <- data.frame(allgenes.common, ave = rowMeans(allgenes.common[,grepl('NES',colnames(allgenes.common))], na.rm = T))
+  allgenes.common <- allgenes.common[order(-allgenes.common$ave),]
+  return (allgenes.common)
+}
+
+write.table(allgenes.common, '/Volumes/data0/users/dyao/average_viper.txt', quote = F, sep = '\t', col.names = NA)
+temp <- read.delim('/Volumes/data0/users/dyao/average_viper.txt', stringsAsFactors = F)
+temp <- data.frame(gene = temp$X, ave_nes = temp$ave)
+write.table(temp, '/Volumes/data0/users/dyao/average_viper_nes.rnk', quote = F, sep = '\t', col.names = NA)
+
+```
+
+
+Load small cell dataset. Clean up data, normalize, and log.
+
+```{r}
+source('~/Dropbox/Doug/generate_RRHO_plots_all_cancers.R')
+ss <- read.delim('~/Dropbox/Doug/DropSeq LungCancerBiopsy20160822.collapsed.human.dge.tsv', row.names = 1)
+rownames(ss) <- fix_date_gene(rownames(ss))
+ss <- ss[,order(-colSums(ss))]
+ss <- ss[,1:156]
+sizes <- colSums(ss)
+ss <- quant_norm(ss)
+ss <- clean_dat(ss)
+ss <- unique(ss)
+```
+
+
+Perform tSNE on expression data. Clusters determined by dbscan. Size of point is number of mapped reads.
+
+```{r}
+library(Rtsne)
+library(dbscan)
+library(ggplot2)
+tsne.ss <- Rtsne(t(ss), initial_dims = 5, theta = 0, max_iter = 2500, perplexity = 30)
+dbscan.ss <- dbscan(tsne.ss$Y, eps = 2.5)
+qplot(x = tsne.ss$Y[,1], y = tsne.ss$Y[,2], colour = as.factor(dbscan.ss$cluster), size = sizes)
+```
+
+
+Perform PCA on expression data. Clusters determined by dbscan and tSNE. Size of point is number of mapped reads.
+
+```{r}
+pca.ss <- prcomp(t(ss), scale = T)
+qplot(x = PC1, y = PC2, data = data.frame(pca.ss$x[,1:2]), colour = as.factor(dbscan.ss$cluster), size = sizes, main = 'Single cell PC1 vs PC2')
+qplot(x = PC2, y = PC3, data = data.frame(pca.ss$x[,2:3]), colour = as.factor(dbscan.ss$cluster), size = sizes, main = 'Single cell PC2 vs PC3')
+```
+
+
+Projection of single-cell data onto CCLE lung PCA space.
+
+```{r}
+ccle <- read.delim('~/Downloads/CCLE_RNAseq_TPM_gene_count_matrix_lung.txt', stringsAsFactors = F, row.names = 2)
+ccle <- ccle[,!grepl('PROSTATE', colnames(ccle))]
+ccle <- ccle[2:ncol(ccle)]
+ccle <- ccle[rowSums(ccle) > 0,] 
+rownames(ccle) <- fix_date_gene(rownames(ccle))
+ccle <- quant_norm(ccle)
+ccle <- clean_dat(ccle)
+
+annot <- read.delim('~/Dropbox/Doug/Prostate_Lung_Comparisons/CCLE_sample_info_file_2012-10-18.txt', stringsAsFactors = F, row.names = 1)
+annot <- annot[grepl('LUNG',rownames(annot)),]
+annot <- annot[rownames(annot) %in% colnames(ccle),]
+annot <- annot[colnames(ccle),]
+annot <- annot[grepl('^adenocarcinoma$|^small_cell_carcinoma$|^squamous_cell_carcinoma$', annot$Hist.Subtype1),]
+
+ccle <- ccle[,colnames(ccle) %in% rownames(annot)]
+
+ccle.pca <- prcomp(t(ccle))
+qplot(x = PC1, y = PC2, data = data.frame(ccle.pca$x[,1:2]), colour = as.factor(annot$Hist.Subtype1), main = 'PC1 vs PC2 CCLE lung')
+
+common <- intersect(rownames(ccle), rownames(ss))
+ccle.common <- ccle[common,]
+ss.common <- ss[common,]
+ccle.pca.common <- prcomp(t(ccle.common))
+ss.pca.common <- prcomp(t(ss.common))
+ss.project.ccle <- scale(t(ss.common), ccle.pca.common$center, ccle.pca.common$scale) %*% ccle.pca.common$rotation 
+ccle.project.ss <- scale(t(ccle.common), ss.pca.common$center, ss.pca.common$scale) %*% ss.pca.common$rotation 
+
+qplot(x = PC1, y = PC2, data = data.frame(ss.project.ccle[,1:2]), colour = as.factor(dbscan.ss$cluster), size = sizes, main = 'Single cell projection onto CCLE PCA')
+qplot(x = PC1, y = PC2, data = data.frame(rbind(ss.project.ccle[,1:2], ccle.pca.common$x[,1:2])), colour = as.factor(c(dbscan.ss$cluster,annot$Hist.Subtype1)), main = 'Single cell projection onto CCLE PCA w/CCLE samples')
+qplot(x = PC1, y = PC2, data = data.frame(ccle.project.ss[,1:2]), colour = as.factor(annot$Hist.Subtype1),main = 'CCLE projection onto single cell PCA')
+qplot(x = PC1, y = PC2, data = data.frame(rbind(ccle.project.ss[,1:2], ss.pca.common$x[,1:2])), colour = as.factor(c(annot$Hist.Subtype1,dbscan.ss$cluster)), main = 'CCLE projection onto single cell PCA w/single cell samples')
+```
+
+
+

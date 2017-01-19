@@ -1,0 +1,172 @@
+---
+title: "Small cell drug data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r, warning=F, echo = F}
+## Load CTRP drug data
+aucs <- read.delim('~/Downloads/CTRPv2.2_2015_pub_CancerDisc_5_1210/v22.data.auc_sensitivities.txt', stringsAsFactors = F)
+drug.labels <- read.delim('~/Downloads/CTRPv2.2_2015_pub_CancerDisc_5_1210/v22.meta.per_compound.txt', stringsAsFactors = F)
+cell.labels <- read.delim('~/Downloads/CTRPv2.2_2015_pub_CancerDisc_5_1210/v22.meta.per_cell_line.txt', stringsAsFactors = F)
+
+lung <- cell.labels[grepl('lung',cell.labels$ccle_primary_site),]
+lung.as <- lung[grepl('^adenocarcinoma',lung$ccle_hist_subtype_1),]
+as.index <- lung.as$index_ccl
+lung.sc <- lung[grepl('^small_cell',lung$ccle_hist_subtype_1),]
+sc.index <- lung.sc$index_ccl
+```
+
+
+```{r,warning=F,echo=F}
+#Perform u-tests
+pvalues = NULL
+for (i in 1:max(aucs$index_cpd)) {
+  temp <- aucs[aucs$index_cpd == i,]
+  sc <- temp[temp$index_ccl %in% sc.index,]
+  as <- temp[temp$index_ccl %in% as.index,]
+  utest <- wilcox.test(sc$area_under_curve, as$area_under_curve, alternative = 't')
+  l.utest <- wilcox.test(sc$area_under_curve, as$area_under_curve, alternative = 'l')
+  pvalue = utest$p.value
+  if (l.utest$p.value > 0.5) {
+    pvalue = log(pvalue)
+  }
+  else {
+    pvalue = -log(pvalue)
+  }
+  if (is.null(pvalues)) {
+    pvalues = c(i,pvalue)
+  }
+  else {
+    pvalues = rbind(pvalues, c(i,pvalue))
+  }
+}
+pvalues <- data.frame(pvalues)
+colnames(pvalues) <- c('index','log_pvalue')
+pvalues <- data.frame(pvalues,cpd_name = drug.labels$cpd_name, target = drug.labels$gene_symbol_of_protein_target, activity = drug.labels$target_or_activity_of_compound)
+pvalues <- pvalues[order(-pvalues$log_pvalue),]
+write.table(pvalues, file = 'CTRP_results.txt', quote = F, sep = '\t', row.names = F)
+```
+
+### CTRP more effective in adenocarcinoma
+```{r, echo = F}
+knitr::kable(head(g.pvalues, 20))
+head(g.pvalues,20)
+```
+
+### CTRP more effective in small cell
+```{r, echo = F}
+knitr::kable(head(l.pvalues, 20))
+```
+
+
+```{r,warning=F, echo = F}
+#Load data from pharmacogenomic landscape paper
+aucs <- read.csv('~/Downloads/aucs.csv', stringsAsFactors = F, skip = 3, header = F)
+aucs <- aucs[c(1,3:nrow(aucs)),]
+
+ic50s <- read.csv('~/Downloads/ic50s.csv', stringsAsFactors = F, skip = 3, header = F)
+ic50s <- ic50s[c(1,3:nrow(ic50s)),]
+
+cell.annot <- read.csv('~/Downloads/cell_lines.csv', stringsAsFactors = F)
+cell.annot <- cell.annot[3:nrow(cell.annot),]
+ad.idx <- cell.annot[cell.annot$X.7 == 'lung_NSCLC_adenocarcinoma',]
+#ad.idx <- cell.annot[cell.annot$X.7 == 'lung_NSCLC_adenocarcinoma' | cell.annot$X.7 == 'lung_NSCLC_squamous_cell_carcinoma',]
+ad.idx <- ad.idx$X
+sc.idx <- cell.annot[cell.annot$X.7 == 'lung_small_cell_carcinoma',]
+sc.idx <- sc.idx$X
+cpd.annot <- read.csv('~/Downloads/cpds.csv', stringsAsFactors = F, skip = 1)
+cpd.annot <- cpd.annot[,-1]
+```
+
+
+
+```{r,warning=F, echo = F}
+#Perform u-tests for AUCs
+pvalues = NULL
+auc.sc <- aucs[aucs$V1 %in% sc.idx,]
+auc.ad <- aucs[aucs$V1 %in% ad.idx,]
+for (i in 3:ncol(aucs)) {
+  sc <- as.numeric(auc.sc[,i])
+  sc <- na.omit(sc)
+  ad <- as.numeric(auc.ad[,i])
+  ad <- na.omit(ad)
+  utest <- wilcox.test(sc, ad, alternative = 't')
+  l.utest <- wilcox.test(sc, ad, alternative = 'l')
+  pvalue = utest$p.value
+  if (l.utest$p.value > 0.5) {
+    pvalue = log(pvalue)
+  }
+  else {
+    pvalue = -log(pvalue)
+  }
+  if (is.null(pvalues)) {
+    pvalues = c(as.numeric(aucs[1,i]),pvalue)
+  }
+  else {
+    pvalues = rbind(pvalues, c(as.numeric(aucs[1,i]),pvalue))
+  }
+}
+
+pvalues <- data.frame(pvalues)
+colnames(pvalues) <- c('index','log_pvalue')
+pvalues <- pvalues[order(pvalues$index),]
+pvalues <- data.frame(pvalues,cpd_name = cpd.annot$Name, target = cpd.annot$Putative.Target, pathway = cpd.annot$Targeted.process.pathway)
+pvalues <- pvalues[order(-pvalues$log_pvalue),]
+write.table(pvalues, file = 'Iorio_results.txt', quote = F, sep = '\t', row.names = F)
+```
+
+### 2016 Cell paper more effective in adenocarcinoma
+```{r, echo = F}
+knitr::kable(head(g.auc.pvals, 20))
+```
+
+### 2016 Cell paper more effective in small cell
+```{r, echo = F}
+knitr::kable(head(l.auc.pvals, 20))
+```
+
+```{r,warning=F, echo = F}
+#Perform t-test for IC50s
+ic50.pvals = NULL
+ic50.sc <- ic50s[ic50s$V1 %in% sc.idx,]
+ic50.ad <- ic50s[ic50s$V1 %in% ad.idx,]
+for (i in 3:ncol(ic50s)) {
+  sc <- as.numeric(ic50.sc[,i])
+  sc <- na.omit(sc)
+  ad <- as.numeric(ic50.ad[,i])
+  ad <- na.omit(ad)
+  ttest <- t.test(sc, ad)
+  pvalue <- -log(ttest$p.value)
+  if (ttest$statistic < 0) {
+    pvalue = -pvalue
+  }
+  if (is.null(ic50.pvals)) {
+    ic50.pvals = c(as.numeric(ic50s[1,i]),pvalue)
+  }
+  else {
+    ic50.pvals = rbind(ic50.pvals, c(as.numeric(ic50s[1,i]),pvalue))
+  }
+}
+
+ic50.pvals <- data.frame(ic50.pvals)
+colnames(ic50.pvals) <- c('index','log_pvalue')
+ic50.pvals <- ic50.pvals[order(ic50.pvals$index),]
+ic50.pvals <- data.frame(ic50.pvals,cpd_name = cpd.annot$Name, target = cpd.annot$Putative.Target, pathway = cpd.annot$Targeted.process.pathway)
+ic50.pvals <- ic50.pvals[order(-ic50.pvals$log_pvalue),]
+```
+
+
+###small cell cross group comparison
+```{r}
+ctrp <- read.delim('~/CTRP_results.txt', stringsAsFactors = F)
+iorio <- read.delim('~/Iorio_results.txt', stringsAsFactors = F)
+
+
+```
+
