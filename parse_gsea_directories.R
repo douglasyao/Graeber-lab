@@ -347,7 +347,10 @@ rename_dir_gsea <- function(dir) {
 }
 
 
-#### OTHER FUNCTIONS
+### Returns all MSigDB gene set names containing a given keyword
+# |keyword| is the keyword contained in the gene set name (ex. 'SECRETION')
+# |type| is 'c2', 'c5', 'cpg', or 'all'. 'c2', 'c5', and 'cpg' will return gene set names from their respective groups from MSigDB. 'all' will return gene set names from all three groups. 
+# OUTPUT: A vector of gene set names
 list_genesets_keyword <- function(keyword, type) {
   if (type == 'all') {
     c5 <- list_genesets_keyword(keyword, 'c5')
@@ -375,7 +378,6 @@ list_genesets_keyword <- function(keyword, type) {
   temp <- temp[!grepl('BIOCARTA',temp)]
   temp <- temp[!grepl('^PID',temp)]
   
-  
   if (type == 'cpg') {
     names = temp
   }
@@ -391,8 +393,11 @@ list_genesets_keyword <- function(keyword, type) {
   return (unique(outputnames))
 }
 
-list_genes_geneset <- function(genesets, type) {
 
+### Returns all genes in given gene sets from MSigDB
+# |genesets| is a vector of gene set names
+# OUTPUT: A single vector containing all the genes in all the gene sets 
+list_genes_geneset <- function(genesets) {
   no.col <- max(count.fields('/Volumes/data0/users/dyao/GSEA_c2/cell_line_bkpt/AUTONOMIC_GANGLIA_cell_line_bkpt/edb/gene_sets.gmt', sep = '\t'))
   genesets.c2 <- read.delim('/Volumes/data0/users/dyao/GSEA_c2/cell_line_bkpt/AUTONOMIC_GANGLIA_cell_line_bkpt/edb/gene_sets.gmt', header = F, stringsAsFactors = F, fill = T, col.names = 1:no.col)
 
@@ -413,7 +418,19 @@ list_genes_geneset <- function(genesets, type) {
   return (allgenes)
 }
 
-### Comparing GSEAs
+
+### Outputs a summary of comparisons between two GSEA directories.
+# |directory1| and |directory2| are the two GSEA directories
+# |label1| is the label to use for GSEA directory 1 in table titles and file name
+# |label2| is the label to use for GSEA directory 2 in table titles and file name
+# |type| is either 'simple' or 'all'.
+# OUTPUT: If |type| is set to 'simple', the output file will be a png containing a table with four columns.
+# The leftmost column will have the top gene sets upregulated in both GSEA directories. Gene sets are sorted by average FDR qval. 
+# The bottommost row has the number of 'overlapping' gene sets, or gene sets that are upregulated in both GSEA directories and both have a qval < 0.25.
+# The remaining three columns are top downregulated gene sets, top gene sets upregulated in 1 and downregulated in 2, and vice versa for the last column.
+# If |type| is set to 'all', the output is a directory containing 8 files. Four of the files are essentially the columns of the table from the 'simple' output,
+# but with NESs, p-values, and FDR q-values listed as well. The other four files are simply all the upregulated and downregulated gene sets from 
+# both GSEA directories with all associated statistics.
 compare_gsea <- function(directory1, directory2, label1, label2, type) {
   file_list1 <- list.files(directory1)
   gsea_neg1 <- file_list1[grepl('gsea_report_for_na_neg_\\d*.xls', file_list1)]
@@ -506,7 +523,16 @@ compare_gsea <- function(directory1, directory2, label1, label2, type) {
   }
 }
 
-compare_gsea_v2 <- function(directory1, directory2, label1, label2, type) {
+
+### Outputs a summary of comparisons between two GSEA directories.
+# |directory1| and |directory2| are the two GSEA directories
+# |label1| is the label to use for GSEA directory 1 in table titles and file name
+# |label2| is the label to use for GSEA directory 2 in table titles and file name
+# |type| is 'all', 'cpg', or 'c2'. If type is 'cpg' or 'c2', then summaries will only contain gene sets from those groups.
+# OUTPUT: A txt file containing a table. The left half of the table will contain the top 100 upregulated gene sets between the two directories.
+# Gene sets are sorted by average NES between both directories. The NES, FDR, and rank of each geneset for each directory are listed as well.
+# The right half of the table is the same as the left for for the top 100 downregulated gene sets.
+compare_gsea_v2 <- function(directory1, directory2, label1, label2, type = 'all') {
   file_list1 <- list.files(directory1)
   gsea_neg1 <- file_list1[grepl('gsea_report_for_na_neg_\\d*.xls', file_list1)]
   gsea_neg_file1 <- read.csv(paste0(directory1,'/',gsea_neg1), sep = '\t')
@@ -526,15 +552,22 @@ compare_gsea_v2 <- function(directory1, directory2, label1, label2, type) {
   temp_neg_file1 <- gsea_neg_file1[!grepl('REACTOME',gsea_neg_file1$NAME),]
   temp_neg_file1 <- temp_neg_file1[!grepl('KEGG',temp_neg_file1$NAME),]
   temp_neg_file1 <- temp_neg_file1[!grepl('BIOCARTA',temp_neg_file1$NAME),]
+  temp_neg_file1 <- temp_neg_file1[!grepl('^PID',temp_neg_file1$NAME),]
+  
   temp_pos_file1 <- gsea_pos_file1[!grepl('REACTOME',gsea_pos_file1$NAME),]
   temp_pos_file1 <- temp_pos_file1[!grepl('KEGG',temp_pos_file1$NAME),]
   temp_pos_file1 <- temp_pos_file1[!grepl('BIOCARTA',temp_pos_file1$NAME),]
+  temp_pos_file1 <- temp_pos_file1[!grepl('^PID',temp_pos_file1$NAME),]
+  
   temp_neg_file2 <- gsea_neg_file2[!grepl('REACTOME',gsea_neg_file2$NAME),]
   temp_neg_file2 <- temp_neg_file2[!grepl('KEGG',temp_neg_file2$NAME),]
   temp_neg_file2 <- temp_neg_file2[!grepl('BIOCARTA',temp_neg_file2$NAME),]
+  temp_neg_file2 <- temp_neg_file2[!grepl('^PID',temp_neg_file2$NAME),]
+  
   temp_pos_file2 <- gsea_pos_file2[!grepl('REACTOME',gsea_pos_file2$NAME),]
   temp_pos_file2 <- temp_pos_file2[!grepl('KEGG',temp_pos_file2$NAME),]
   temp_pos_file2 <- temp_pos_file2[!grepl('BIOCARTA',temp_pos_file2$NAME),]
+  temp_pos_file2 <- temp_pos_file2[!grepl('^PID',temp_pos_file2$NAME),]
   
   if (type == 'cpg') {
     gsea_neg_file1 <- temp_neg_file1
@@ -575,6 +608,10 @@ compare_gsea_v2 <- function(directory1, directory2, label1, label2, type) {
   write.table(combined, paste0(label1,'_vs_',label2,'_comparisons_', type, '.txt'), row.names = F, quote = F, sep = '\t')
 }
 
+
+### Calls the function compare_gsea for all possible cross comparisons of GSEAs within two directories of GSEAs.
+# |directory1| and |directory2| are both directories containing multiple subdirectories, each of which is the output from running GSEA on a single .rnk metric file.
+# |type| is either 'simple' or 'all'. See compare_gsea.
 compare_gsea_all_cross_comparisons <- function(directory1, directory2, type) {
   file_list1 <- list.files(directory1)
   file_list2 <- list.files(directory2)
@@ -589,9 +626,12 @@ compare_gsea_all_cross_comparisons <- function(directory1, directory2, type) {
 }
 
 
-
-### PARSING GSEA DIRECTORIES
-gsea_obtain_top <- function(directory) {
+### Returns the top gene sets for each individual GSEA directory in a directory
+# |directory| is a directory containing multiple subdirectories, each of which is the output from running GSEA on a single .rnk metric file.
+# |outfileprefix| is the prefix for the output file name
+# OUTPUT: Two txt files containing tables. Each table has each of the GSEA directories as columns and the top 20 upregulated/downregulated gene sets by NES for each GSEA listed underneath.
+# NOTE: no cross-GSEA comparisons happen, this is simply to list the names
+gsea_obtain_top <- function(directory, outfileprefix) {
   file_list <- list.files(directory)
   combined_neg = NULL
   combined_pos = NULL
@@ -609,44 +649,15 @@ gsea_obtain_top <- function(directory) {
   colnames(combined_neg) <- file_list
   colnames(combined_pos) <- file_list
   
-  write.table(combined_neg, filename = 'up_all.txt', quote = F, row.names = F, sep = '\t')
-  write.table(combined_pos, filename = 'down_all.txt', quote = F, row.names = F, sep = '\t')
-  
+  write.table(combined_neg, file = paste0(outfileprefix, '_up_all.txt'), quote = F, row.names = F, sep = '\t')
+  write.table(combined_pos, file = paste0(outfileprefix, '_down_all.txt'), quote = F, row.names = F, sep = '\t')
 }
 
-gsea_obtain_top_combined <- function(directory1, directory2, label1) {
-  
-  subfile_list1 <- list.files(directory1)
-  gsea_neg1 <- subfile_list1[grepl('gsea_report_for_na_neg_\\d*.xls', subfile_list1)]
-  gsea_neg1 <- read.csv(paste0(directory1,'/',gsea_neg1), sep = '\t')
-  gsea_pos1 <- subfile_list1[grepl('gsea_report_for_na_pos_\\d*.xls', subfile_list1)]
-  gsea_pos1 <- read.csv(paste0(directory1,'/',gsea_pos1), sep = '\t')
-  
-  subfile_list2 <- list.files(directory2)
-  gsea_neg2 <- subfile_list2[grepl('gsea_report_for_na_neg_\\d*.xls', subfile_list2)]
-  gsea_neg2 <- read.csv(paste0(directory2,'/',gsea_neg2), sep = '\t')
-  gsea_pos2 <- subfile_list2[grepl('gsea_report_for_na_pos_\\d*.xls', subfile_list2)]
-  gsea_pos2 <- read.csv(paste0(directory2,'/',gsea_pos2), sep = '\t')
-  
-  nums <- paste0(1:10, '. ')
-  nums2 <- paste0(11:20, '. ')
-  combined <- data.frame(strtrim(paste0(nums, as.character(gsea_pos1$NAME[1:10])), 36), strtrim(paste0(nums2, as.character(gsea_pos1$NAME[11:20])), 36), strtrim(paste0(nums, as.character(gsea_neg1$NAME[1:10])), 36), strtrim(paste0(nums2, as.character(gsea_neg1$NAME[11:20])), 36), strtrim(paste0(nums, as.character(gsea_pos2$NAME[1:10])), 36), strtrim(paste0(nums2, as.character(gsea_pos2$NAME[11:20])), 36), strtrim(paste0(nums, as.character(gsea_neg2$NAME[1:10])), 36), strtrim(paste0(nums2, as.character(gsea_neg2$NAME[11:20])), 36))
-  colnames(combined) <- NULL
-  rownames(combined) <- NULL
-  png(paste0(label1,'_combined_top_20.png'), height = 250, width = 1875)
-  t <- tableGrob(combined, rows = NULL, theme = ttheme_default(base_size = 10, base_colour = 'black'))
-  t <- gtable_add_rows(t, unit(1, "line"), 0)
-  t <- gtable_add_grob(t, list(textGrob(paste0('Top 20 Up ', label1, ' by breakpoints'), gp = gpar(fontsize = 14, fontface = 'bold')), textGrob(paste0('Top 20 Down ', label1,' by breakpoints'),gp = gpar(fontsize = 14, fontface = 'bold')), textGrob(paste0('Top 20 Up ', label1, ' by ICNA'),gp = gpar(fontsize = 14, fontface = 'bold')), textGrob(paste0('Top 20 Down ', label1, ' by ICNA'),gp = gpar(fontsize = 14, fontface = 'bold'))), t=1,b=1,l=c(1, 3, 5, 7), r=c(2, 4, 6, 8))
-  seg1 <- segmentsGrob(x0 = unit(0,"npc"), y0 = unit(0,"npc"), x1 = unit(0,"npc"), y1 = unit(10,"npc"), gp = gpar(lwd = 3.0))
-  t <- gtable_add_grob(t, seg1, t = 2, b = 11, l = 3, r = 3)
-  seg1 <- segmentsGrob(x0 = unit(0,"npc"), y0 = unit(0,"npc"), x1 = unit(0,"npc"), y1 = unit(10,"npc"), gp = gpar(lwd = 3.0))
-  t <- gtable_add_grob(t, seg1, t = 2, b = 11, l = 5, r = 5)
-  seg1 <- segmentsGrob(x0 = unit(0,"npc"), y0 = unit(0,"npc"), x1 = unit(0,"npc"), y1 = unit(10,"npc"), gp = gpar(lwd = 3.0))
-  t <- gtable_add_grob(t, seg1, t = 2, b = 11, l = 7, r = 7)
-  grid.arrange(t)
-  dev.off()
-}
-
+### Outputs a summary of statistics from a GSEA directory
+# |directory1| is a GSEA directory
+# |label| is a label for the directory to use in table titles and file name
+# OUTPUT: A png file containing a table. The left half contains the top 20 upregulated gene sets ordered by FDR. The FDR is also listed.
+# The right half contains the top 20 downregulated gene sets.
 gsea_obtain_top_single <- function(directory1, label) {
   subfile_list1 <- list.files(directory1)
   gsea_neg1 <- subfile_list1[grepl('gsea_report_for_na_neg_\\d*.xls', subfile_list1)]
@@ -748,244 +759,4 @@ gsea_obtain_top_single <- function(directory1, label) {
   t <- gtable_add_grob(t, seg1, t = 2, b = 12, l = 7, r = 7)
   grid.arrange(t)
   dev.off()
-}
-
-### Genes from GSEA
-library(plyr)
-library(rowr)
-get_genes <- function(directory, outfile_prefix, num_genes) {
-  file_list <- list.files(directory)
-  gsea_neg <- file_list[grepl('gsea_report_for_na_neg_\\d*.xls', file_list)]
-  gsea_neg <- read.csv(paste0(directory,'/',gsea_neg), sep = '\t')
-  gsea_neg <- gsea_neg[order(gsea_neg$FDR.q.val),]
-  gsea_neg_names <- as.character(gsea_neg$NAME)
-  gsea_neg_names2 <- paste0(gsea_neg_names, '.xls')
-  gsea_neg_names2 <- intersect(gsea_neg_names2, file_list)
-  gsea_neg_names3 <- strtrim(gsea_neg_names2, nchar(gsea_neg_names2)-4)
-  
-  gsea_pos <- file_list[grepl('gsea_report_for_na_pos_\\d*.xls', file_list)]
-  gsea_pos <- read.csv(paste0(directory,'/',gsea_pos), sep = '\t')
-  gsea_pos <- gsea_pos[order(gsea_pos$FDR.q.val),]
-  gsea_pos_names <- as.character(gsea_pos$NAME)
-  gsea_pos_names2 <- paste0(gsea_pos_names, '.xls')
-  gsea_pos_names2 <- intersect(gsea_pos_names2, file_list)
-  gsea_pos_names3 <- strtrim(gsea_pos_names2, nchar(gsea_pos_names2)-4)
-  
-  neg_genes <- NULL
-  pos_genes <- NULL
-  if (length(gsea_neg_names2) > 0) {
-    for (i in 1:length(gsea_neg_names2)) {
-      genes <- read.csv(paste0(directory,'/',gsea_neg_names2[i]), sep = '\t')
-      genes <- genes[rev(rownames(genes)),]
-      genes <- data.frame(name = genes$PROBE, rank = (num_genes - genes$RANK.IN.GENE.LIST), metric = genes$RANK.METRIC.SCORE)
-      colnames(genes)[1] <- gsea_neg_names3[i]
-      if (is.null(neg_genes)) {
-        neg_genes = genes
-      }
-      else {
-        neg_genes <- cbind.fill(neg_genes, genes, fill = '')
-      }
-    }
-  }
-  
-  if (length(gsea_pos_names2 > 0)) {
-    for (i in 1:length(gsea_pos_names2)) {
-      genes <- read.csv(paste0(directory,'/',gsea_pos_names2[i]), sep = '\t')
-      genes <- data.frame(name = genes$PROBE, rank = genes$RANK.IN.GENE.LIST, metric = genes$RANK.METRIC.SCORE)
-      colnames(genes)[1] <- gsea_pos_names3[i]
-      if (is.null(pos_genes)) {
-        pos_genes = genes
-      }
-      else {
-        pos_genes <- cbind.fill(pos_genes, genes, fill = '')
-      }
-    }
-  }
-  write.table(neg_genes, file = paste0(outfile_prefix, '_down_genes.txt'), row.names = F, quote = F, sep = '\t')
-  write.table(pos_genes, file = paste0(outfile_prefix, '_up_genes.txt'), row.names = F, quote = F, sep = '\t')
-}
-
-compare_genes <- function(file1, file2, name1, name2) {
-  names1 <- read.delim(file1, stringsAsFactors = F)
-  names2 <- read.delim(file2, stringsAsFactors = F)
-  sets1 <- colnames(names1)[seq(1, length(colnames(names1)), 3)]
-  sets2 <- colnames(names2)[seq(1, length(colnames(names2)), 3)]
-  
-  combined1 <- NULL
-  combined2 <- NULL
-  i = 1
-  while(i < ncol(names1)) {
-    temp <- names1[,i:(i+2)]
-    temp <- temp[!temp[,1] == '',]
-    temp <- cbind(temp, rep(colnames(temp)[1], nrow(temp)), stringsAsFactors = F)
-    colnames(temp) <- c('GENE', 'RANK', 'METRIC', 'GENESET')
-    combined1 <- rbind(combined1, temp, stringsAsFactors = F)
-    i = i + 3
-  }
-  
-  i = 1
-  while(i < ncol(names2)) {
-    temp <- names2[,i:(i+2)]
-    temp <- temp[!temp[,1] == '',]
-    temp <- cbind(temp, rep(colnames(temp)[1], nrow(temp)), stringsAsFactors = F)
-    colnames(temp) <- c('GENE', 'RANK', 'METRIC', 'GENESET')
-    combined2 <- rbind(combined2, temp, stringsAsFactors = F)
-    i = i + 3
-  }
-  
-  dup1 <- combined1[duplicated(combined1$GENE),]
-  dup_genes1 <- unique(dup1$GENE)
-  collapsed1 = NULL
-  for (i in dup_genes1) {
-    common <- combined1[combined1$GENE == i,]
-    set <- paste(common$GENESET, collapse = ', ')
-    common <- data.frame(common[1,1:3], GENESET = set)
-    collapsed1 <- rbind(collapsed1, common)
-  }
-  
-  combined1 <- rbind(collapsed1, combined1)
-  combined1 <- combined1[!duplicated(combined1$GENE),]
-  combined1 <- combined1[order(combined1$RANK),]
-  
-  dup2 <- combined2[duplicated(combined2$GENE),]
-  dup_genes2 <- unique(dup1$GENE)
-  collapsed2 = NULL
-  for (i in dup_genes2) {
-    common <- combined2[combined2$GENE == i,]
-    set <- paste(common$GENESET, collapse = ', ')
-    common <- data.frame(common[1,1:3], GENESET = set)
-    collapsed2 <- rbind(collapsed2, common)
-  }
-  
-  combined2 <- rbind(collapsed2, combined2)
-  combined2 <- combined2[!duplicated(combined2$GENE),]
-  combined2 <- combined2[order(combined2$RANK),]
-  
-  file_name1 <- gsub('_genes.txt','',file1)
-  file_name2 <- gsub('_genes.txt','',file2)
-  combined1 <- na.omit(combined1)
-  combined2 <- na.omit(combined2)
-  write.table(combined1, file = paste0(name1, '_BY_GENE.txt'), quote = F, sep = '\t', row.names = F)
-  write.table(combined2, file = paste0(name2, '_BY_GENE.txt'), quote = F, sep = '\t', row.names = F)
-  
-  common_genes <- intersect(combined1$GENE, combined2$GENE)
-  rownames(combined1) <- combined1$GENE
-  rownames(combined2) <- combined2$GENE
-  colnames(combined1) <- paste0(file_name1, '_', colnames(combined1))
-  colnames(combined2) <- paste0(file_name2, '_', colnames(combined2))
-  common_genes2 <- data.frame(common_genes, combined1[common_genes, 2:4], combined2[common_genes, 2:4])
-  common_genes2 <- common_genes2[order((as.numeric(common_genes2[,2]) + as.numeric(common_genes2[,5]))/2),]
-  
-  write.table(common_genes2, file = paste(name1, 'vs', name2, 'OVERLAPPING_GENES.txt', sep = '_'), quote = F, sep = '\t', row.names = F)
-}
-
-compare_genes_all_cross_comparisons <- function(directory1, directory2) {
-  file_list1 <- list.files(directory1)
-  up_file_list1 <- file_list1[grepl('_up_', file_list1)]
-  down_file_list1 <- file_list1[grepl('_down_', file_list1)]
-  
-  file_list2 <- list.files(directory2)
-  up_file_list2 <- file_list2[grepl('_up_', file_list2)]
-  down_file_list2 <- file_list2[grepl('_down_', file_list2)]
-  
-  current_dir <- getwd()
-  dir.create(paste0(directory1,'_vs_',directory2, '_GENE_COMPARISONS'))
-  setwd(paste0(directory1,'_vs_',directory2, '_GENE_COMPARISONS'))
-  combinations_up <- expand.grid(up_file_list1, up_file_list2) 
-  combinations_down <- expand.grid(down_file_list1, down_file_list2)
-  for (i in 1:nrow(combinations_up)) {
-    compare_genes(paste0('../',directory1,'/',combinations_up[i,1]), paste0('../', directory2,'/',combinations_up[i,2]), gsub('_genes.txt', '', as.character(combinations_up[i,1])), gsub('_genes.txt', '', as.character(combinations_up[i,2])))
-  }
-  
-  for (i in 1:nrow(combinations_down)) {
-    compare_genes(paste0('../',directory1,'/',combinations_down[i,1]), paste0('../', directory2,'/',combinations_down[i,2]), gsub('_genes.txt', '', as.character(combinations_down[i,1])), gsub('_genes.txt', '', as.character(combinations_down[i,2])))
-  }
-  setwd(current_dir)
-}
-
-
-gsea_lookup_keyword <- function(word) {
-  dir <- '/Volumes/data0/users/dyao/GSEA/'
-  genelist <- list(cellbkpt = rep(18900, 23), cellicna = rep(18900, 23), stem = c(15518, 24693, 18802, 19104, 18653), tumorbkpt = rep(18990, 35), tumoricna = rep(18990, 35))
-  files <- list.files(dir)
-  setnames <- NULL
-  fullgenes <- list()
-  for (i in 1:length(files)) {
-    file_list <- list.files(paste0(dir, files[i]))
-    for (j in 1:length(file_list)) {
-      subfile_list <- list.files(paste0(dir, files[i], '/', file_list[j]))
-      gsea_neg <- subfile_list[grepl('gsea_report_for_na_neg_\\d*.xls', subfile_list)]
-      gsea_neg <- read.csv(paste0(dir, files[i], '/', file_list[j], '/', gsea_neg), sep = '\t')
-      gsea_neg <- gsea_neg[gsea_neg$FDR.q.val < 0.25,]
-      gsea_neg <- gsea_neg[grepl(word, gsea_neg$NAME),]
-      gsea_neg_names <- as.character(gsea_neg$NAME)
-      gsea_neg_names2 <- paste0(gsea_neg_names, '.xls')
-      gsea_neg_names2 <- intersect(gsea_neg_names2, subfile_list)
-      gsea_neg_names3 <- substr(gsea_neg_names2, 0, nchar(gsea_neg_names2)-4)
-      
-      gsea_pos <- subfile_list[grepl('gsea_report_for_na_pos_\\d*.xls', subfile_list)]
-      gsea_pos <- read.csv(paste0(dir, files[i],'/', file_list[j], '/', gsea_pos), sep = '\t')
-      gsea_pos <- gsea_pos[gsea_pos$FDR.q.val < 0.25,]
-      gsea_pos <- gsea_pos[grepl(word, gsea_pos$NAME),]
-      gsea_pos_names <- as.character(gsea_pos$NAME)
-      gsea_pos_names2 <- paste0(gsea_pos_names, '.xls')
-      gsea_pos_names2 <- intersect(gsea_pos_names2, subfile_list)
-      gsea_pos_names3 <- substr(gsea_pos_names2, 0, nchar(gsea_pos_names2)-4)
-      
-      
-      if (length(gsea_neg_names2) > 0) {
-        temp <- data.frame(NAME = gsea_neg$NAME, NES = gsea_neg$NES, FDRqval = gsea_neg$FDR.q.val, TYPE = file_list[j])
-        setnames <- rbind(setnames, temp)
-        for (k in 1:length(gsea_neg_names2)) {
-          genes <- read.csv(paste0(dir, files[i],'/', file_list[j], '/', gsea_neg_names2[k]), sep = '\t')
-          genes <- genes[rev(rownames(genes)),]
-          if (!(gsea_neg_names3[k] %in% names(fullgenes))) {
-            temp <- data.frame((genelist[[i]][j] - genes$RANK.IN.GENE.LIST), genes$RANK.METRIC.SCORE, row.names = genes$PROBE)
-            colnames(temp) <- c(paste0(file_list[j], '_RANK'), 'METRIC')
-            fullgenes[[gsea_neg_names3[k]]] <- temp
-          }
-          
-          else if (gsea_neg_names3[k] %in% names(fullgenes)) {
-            temp <- data.frame((genelist[[i]][j] - genes$RANK.IN.GENE.LIST), genes$RANK.METRIC.SCORE, row.names = genes$PROBE)
-            colnames(temp) <- c(paste0(file_list[j], '_RANK'), 'METRIC')
-            geneorder <- rownames(fullgenes[[gsea_neg_names3[k]]])
-            temp <- temp[geneorder,]
-            fullgenes[[gsea_neg_names3[k]]] <- cbind(fullgenes[[gsea_neg_names3[k]]], temp)
-          }
-        }
-      }
-      
-      if (length(gsea_pos_names2) > 0) {
-        temp <- data.frame(NAME = gsea_pos$NAME, NES = gsea_pos$NES, FDRqval = gsea_pos$FDR.q.val, TYPE = file_list[j])
-        setnames <- rbind(setnames, temp)
-        for (k in 1:length(gsea_pos_names2)) {
-          genes <- read.csv(paste0(dir, files[i],'/', file_list[j], '/', gsea_pos_names2[k]), sep = '\t')
-          if (!(gsea_pos_names3[k] %in% names(fullgenes))) {
-            temp <- data.frame(genes$RANK.IN.GENE.LIST, genes$RANK.METRIC.SCORE, row.names = genes$PROBE)
-            colnames(temp) <- c(paste0(file_list[j], '_RANK'), 'METRIC')
-            fullgenes[[gsea_pos_names3[k]]] <- temp
-          }
-          
-          else if (gsea_pos_names3[k] %in% names(fullgenes)) {
-            temp <- data.frame(genes$RANK.IN.GENE.LIST, genes$RANK.METRIC.SCORE, row.names = genes$PROBE)
-            colnames(temp) <- c(paste0(file_list[j], '_RANK'), 'METRIC')
-            geneorder <- rownames(fullgenes[[gsea_pos_names3[k]]])
-            temp <- temp[geneorder,]
-            fullgenes[[gsea_pos_names3[k]]] <- cbind(fullgenes[[gsea_pos_names3[k]]], temp)
-          }
-        }
-      }
-    }
-  }
-  write.table(setnames, file = paste0('GSEA_genesets_', word, '.txt'), row.names = F, sep = '\t', quote = F)
-  for (x in 1:length(fullgenes)) {
-    temp <- fullgenes[[x]]
-    if (ncol(temp) > 2) {
-      avgranks <- rowMeans(temp[,seq(1,ncol(temp),2)])
-      avgranks <- avgranks[order(avgranks)]
-      fullgenes[[x]] <- temp[order(rowMeans(temp[,seq(1,ncol(temp),2)])),]
-      fullgenes[[x]] <- data.frame(fullgenes[[x]], AVGRANK = avgranks)
-    }
-    write.table(fullgenes[[x]], file = paste0(names(fullgenes)[x], '_genes.txt'), sep = '\t', quote = F, col.names = NA)
-  }
 }

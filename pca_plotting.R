@@ -1,3 +1,7 @@
+#### pca_plotting.R
+#### Functions for performing principal component analysis (PCA)
+
+
 library(RColorBrewer)
 library(ggplot2)
 library(pheatmap)
@@ -5,7 +9,7 @@ library(GGally)
 library(Hmisc)
 library(limma)
 
-#input dataset should have nothign but actual #'s.(you can have header and rownames of course)
+#Input dataset should have nothign but actual #'s.(you can have header and rownames of course)
 #INPUT: |dataset| is a dataset where columns are genes, and rows are samples, because we are using the pr.comp function.
 #|outfile_prefix| is the output name without the extension for example "this_is_the_dataset_name"
 #|colors| is a list of the colors, its length is equal to the # of samples e.g. factor(rep(c(1,2),each=12)) .. 
