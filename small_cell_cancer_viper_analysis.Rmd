@@ -1,0 +1,205 @@
+---
+title: "small cell viper"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Beltran 2011
+
+```{r}
+library(viper)
+library(mixtools)
+
+data <- as.matrix(read.delim('/Volumes/data0/users/dyao/small_cell_datasets/beltran2011.txt', row.names = 1, stringsAsFactors = F))
+colnames(data) <- gsub('Bel\\.','',colnames(data))
+reg <- aracne2regulon('/Volumes/data0/users/dyao/aracne_small_cell/beltran2011_network.txt', data)
+annot <- read.delim('~/Dropbox/Doug/Prostate_Lung_Comparisons/Beltran.2011_Annotations.txt', stringsAsFactors = F)
+org <- annot[annot$Diagnosis == 'PCa',]
+sc <- annot[annot$Diagnosis == 'small cell PCa',]
+
+sig <- rowTtest(data[,sc$SampleID], data[,org$SampleID])
+sig <- (qnorm(sig$p.value/2, lower.tail = F) * sign(sig$statistic)[,1])
+null <- ttestNull(data[,sc$SampleID], data[,org$SampleID])
+
+ms <- msviper(sig,reg,null)
+shadow <- shadow(ms, regulators = 25)
+syn <- msviperCombinatorial(ms, regulators = 25)
+syn <- msviperSynergy(syn)
+write.table(summary(ms, 1145), 'Beltran2011_msviper.txt', quote = F, row.names = F, sep = '\t')
+write.table(summary(shadow, 1145)[[1]], 'Beltran2011_shadow.txt', quote = F, row.names = F, sep = '\t')
+write.table(summary(shadow, 1145)[[2]], 'Beltran2011_shadow_pairs.txt', quote = F, row.names = F, sep = '\t')
+```
+
+
+## Beltran 2016
+
+```{r}
+require(viper)
+require(mixtools)
+
+data <- as.matrix(read.delim('/Volumes/data0/users/dyao/small_cell_datasets/beltran2016.txt', row.names = 1, stringsAsFactors = F))
+reg <- aracne2regulon('/Volumes/data0/users/dyao/aracne_small_cell/beltran2016_network.txt', data)
+
+sig <- rowTtest(data[,grepl('_N',colnames(data))], data[,grepl('_C',colnames(data))])
+sig <- (qnorm(sig$p.value/2, lower.tail = F) * sign(sig$statistic)[,1])
+null <- ttestNull(data[,grepl('_N',colnames(data))], data[,grepl('_C',colnames(data))])
+
+ms <- msviper(sig,reg,null)
+shadow <- shadow(ms, regulators = 25)
+syn <- msviperCombinatorial(ms, regulators = 25)
+syn <- msviperSynergy(syn)
+write.table(summary(ms, 2757), 'Beltran2016_msviper.txt', quote = F, row.names = F, sep = '\t')
+write.table(summary(shadow, 2757)[[1]], 'Beltran2016_shadow.txt', quote = F, row.names = F, sep = '\t')
+write.table(summary(shadow, 2757)[[2]], 'Beltran2016_shadow_pairs.txt', quote = F, row.names = F, sep = '\t')
+
+```
+
+
+## CCLE small cell vs adenosquamous
+
+```{r}
+require(viper)
+require(mixtools)
+
+data <- as.matrix(read.delim('/Volumes/data0/users/dyao/small_cell_datasets/ccle_lung.txt', row.names = 1, stringsAsFactors = F))
+reg <- aracne2regulon('/Volumes/data0/users/dyao/aracne_small_cell/ccle_lung_network.txt', data)
+
+annot <- read.delim('~/Dropbox/Doug/Prostate_Lung_Comparisons/CCLE_sample_info_file_2012-10-18.txt', stringsAsFactors = F)
+lp <- annot[annot$CCLE.name %in% colnames(data),]
+lp <- lp[match(colnames(data),lp$CCLE.name),]
+type <- factor(as.character(sapply(lp$Hist.Subtype1, function(x) if(grepl("^small_cell",x)) "small_cell" else if(grepl("^adenocarcinoma",x)) "adeno" else if(grepl("^squamous",x)) "squamous" else 'other')),levels=c('small_cell','adeno','squamous','other'))
+
+sig <- rowTtest(data[,grepl('^small_cell',lp$Hist.Subtype1)], data[,grepl('^adenocarcinoma|^squamous',lp$Hist.Subtype1)])
+sig <- (qnorm(sig$p.value/2, lower.tail = F) * sign(sig$statistic)[,1])
+null <- ttestNull(data[,grepl('^small_cell',lp$Hist.Subtype1)], data[,grepl('^adenocarcinoma|^squamous',lp$Hist.Subtype1)])
+
+ms <- msviper(sig,reg,null)
+shadow <- shadow(ms, regulators = 25)
+
+syn <- msviperCombinatorial(ms, regulators = 25)
+syn <- msviperSynergy(syn)
+write.table(summary(ms, 2727), 'CCLE_msviper.txt', quote = F, row.names = F, sep = '\t')
+write.table(summary(shadow, 2727)[[1]], 'CCLE_shadow.txt', quote = F, row.names = F, sep = '\t')
+write.table(summary(shadow, 2727)[[2]], 'CCLE_shadow_pairs.txt', quote = F, row.names = F, sep = '\t')
+write.table(summary(syn, 2727), 'CCLE_synergy.txt', quote = F, row.names = F, sep = '\t')
+
+```
+
+
+## WCDT
+
+```{r}
+require(viper)
+require(mixtools)
+
+data <- as.matrix(read.delim('/Volumes/data0/users/dyao/small_cell_datasets/wcdt.txt', row.names = 1, stringsAsFactors = F))
+reg <- aracne2regulon('/Volumes/data0/users/dyao/aracne_small_cell/wcdt_network.txt', data)
+annot <- read.csv('~/Dropbox/Datasets_Small_Cell/WCDT/WCDT_histology_June2015.csv', stringsAsFactors = F)
+sc.annot <- annot[2:7,1]
+adeno.annot <- annot[25:46,1]
+
+sig <- rowTtest(data[,gsub('-','\\.',sc.annot)], data[,gsub('-','\\.',adeno.annot)])
+sig <- (qnorm(sig$p.value/2, lower.tail = F) * sign(sig$statistic)[,1])
+null <- ttestNull(data[,gsub('-','\\.',sc.annot)], data[,gsub('-','\\.',adeno.annot)])
+
+ms <- msviper(sig,reg,null)
+shadow <- shadow(ms, regulators = 25)
+syn <- msviperCombinatorial(ms, regulators = 25)
+syn <- msviperSynergy(syn)
+write.table(summary(ms, 1955), 'wcdt_msviper.txt', quote = F, row.names = F, sep = '\t')
+write.table(summary(shadow, 1955)[[1]], 'wcdt_shadow.txt', quote = F, row.names = F, sep = '\t')
+write.table(summary(shadow, 1955)[[2]], 'wcdt_shadow_pairs.txt', quote = F, row.names = F, sep = '\t')
+
+```
+
+
+## ZHANG 2015 metastasis
+
+```{r}
+require(viper)
+require(mixtools)
+
+data <- as.matrix(read.delim('/Volumes/data0/users/dyao/small_cell_datasets/zhang2015_metastasis.txt', row.names = 1, stringsAsFactors = F))
+reg <- aracne2regulon('/Volumes/data0/users/dyao/aracne_small_cell/zhang2015_metastasis_network.txt', data)
+
+zhang <- getGEO(GEO = 'GSE66187', destdir = getwd())
+zhang <- zhang[[1]]
+annot <- pData(zhang)
+annot <- annot[,c('title','characteristics_ch2.3')]
+annot <- data.frame(paste0(annot$title, annot$characteristics_ch2.3), row.names = rownames(annot))
+types <- factor(as.character(sapply(annot$paste0.annot.title..annot.characteristics_ch2.3., function(x) if(grepl('xenograft.*ne group: CHGA negative group$',x)) "xenograft.CRPC" else if(grepl('xenograft.*ne group: CHGA positive/ SYP positive/ ',x)) "xenograft.NEPC" else if(grepl('metastasis.*ne group: CHGA negative group$',x)) "meta.CRPC" else if(grepl('metastasis.*ne group: CHGA positive/ SYP positive/ ',x)) "meta.NEPC" else 'na')),levels=c('xenograft.CRPC','xenograft.NEPC','meta.CRPC','meta.NEPC','na'))
+annot <- data.frame(sample = as.character(rownames(annot)), type = as.character(types))
+
+sig <- rowTtest(data[,as.character(annot[annot$type == 'meta.NEPC',1])], data[,as.character(annot[annot$type == 'meta.CRPC',1])])
+sig <- (qnorm(sig$p.value/2, lower.tail = F) * sign(sig$statistic)[,1])
+null <- ttestNull(data[,as.character(annot[annot$type == 'meta.NEPC',1])], data[,as.character(annot[annot$type == 'meta.CRPC',1])])
+
+ms <- msviper(sig,reg,null)
+shadow <- shadow(ms, regulators = 25)
+syn <- msviperCombinatorial(ms, regulators = 25)
+syn <- msviperSynergy(syn)
+write.table(summary(ms, 2568), 'zhang2015_metastasis_msviper.txt', quote = F, row.names = F, sep = '\t')
+write.table(summary(shadow, 2568)[[1]], 'zhang2015_metastasis_shadow.txt', quote = F, row.names = F, sep = '\t')
+write.table(summary(shadow, 2568)[[2]], 'zhang2015_metastasis_shadow_pairs.txt', quote = F, row.names = F, sep = '\t')
+
+```
+
+
+## ZHANG 2015 xenograft
+
+```{r}
+require(viper)
+require(mixtools)
+
+data <- as.matrix(read.delim('/Volumes/data0/users/dyao/small_cell_datasets/zhang2015_xenograft.txt', row.names = 1, stringsAsFactors = F))
+reg <- aracne2regulon('/Volumes/data0/users/dyao/aracne_small_cell/zhang2015_xenograft_network.txt', data)
+
+zhang <- getGEO(GEO = 'GSE66187', destdir = getwd())
+zhang <- zhang[[1]]
+annot <- pData(zhang)
+annot <- annot[,c('title','characteristics_ch2.3')]
+annot <- data.frame(paste0(annot$title, annot$characteristics_ch2.3), row.names = rownames(annot))
+types <- factor(as.character(sapply(annot$paste0.annot.title..annot.characteristics_ch2.3., function(x) if(grepl('xenograft.*ne group: CHGA negative group$',x)) "xenograft.CRPC" else if(grepl('xenograft.*ne group: CHGA positive/ SYP positive/ ',x)) "xenograft.NEPC" else if(grepl('metastasis.*ne group: CHGA negative group$',x)) "meta.CRPC" else if(grepl('metastasis.*ne group: CHGA positive/ SYP positive/ ',x)) "meta.NEPC" else 'na')),levels=c('xenograft.CRPC','xenograft.NEPC','meta.CRPC','meta.NEPC','na'))
+annot <- data.frame(sample = as.character(rownames(annot)), type = as.character(types))
+
+sig <- rowTtest(data[,as.character(annot[annot$type == 'xenograft.NEPC',1])], data[,as.character(annot[annot$type == 'xenograft.CRPC',1])])
+sig <- (qnorm(sig$p.value/2, lower.tail = F) * sign(sig$statistic)[,1])
+null <- ttestNull(data[,as.character(annot[annot$type == 'xenograft.NEPC',1])], data[,as.character(annot[annot$type == 'xenograft.CRPC',1])])
+
+ms <- msviper(sig,reg,null)
+shadow <- shadow(ms, regulators = 25)
+syn <- msviperCombinatorial(ms, regulators = 25)
+syn <- msviperSynergy(syn)
+write.table(summary(ms, 17), 'zhang2015_xenograft_msviper.txt', quote = F, row.names = F, sep = '\t')
+write.table(summary(shadow, 17)[[1]], 'zhang2015_xenograft_shadow.txt', quote = F, row.names = F, sep = '\t')
+write.table(summary(shadow, 17)[[2]], 'zhang2015_xenograft_shadow_pairs.txt', quote = F, row.names = F, sep = '\t')
+```
+
+
+## George TCGA
+
+```{r}
+require(viper)
+require(mixtools)
+
+data <- as.matrix(read.delim('/Volumes/data0/users/dyao/small_cell_datasets/george_TCGA_lung.txt', row.names = 1, stringsAsFactors = F))
+reg <- aracne2regulon('/Volumes/data0/users/dyao/aracne_small_cell/george_TCGA_network.txt', data)
+
+sig <- rowTtest(data[,!grepl('TCGA',colnames(data))], data[,grepl('TCGA',colnames(data))])
+sig <- (qnorm(sig$p.value/2, lower.tail = F) * sign(sig$statistic)[,1])
+null <- ttestNull(data[,!grepl('TCGA',colnames(data))], data[,grepl('TCGA',colnames(data))])
+
+ms <- msviper(sig,reg,null)
+shadow <- shadow(ms, regulators = 25)
+syn <- msviperCombinatorial(ms, regulators = 25)
+syn <- msviperSynergy(syn)
+
+```
+
+
+
+
