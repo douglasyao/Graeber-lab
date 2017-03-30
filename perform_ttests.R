@@ -1,4 +1,40 @@
-### Performs t-test for each row of matrix
+### Calculate p-value from generalized linear model for each row of matrix
+# |data| is a matrix with genes as rows and samples as columns
+# |model| is the model matrix
+# |contrast| is the contrast
+# |output| is the name of the file to be outputted. If NULL, will return pvalues as a data frame.
+log_pvalues_from_glm <- function(data, model, contrast, output = NULL) {
+  pvalues = NULL
+  data <- as.matrix(data)
+  for (i in 1:nrow(data)) {
+    gene <- data[i,]
+    summ <- summary(lm(as.numeric(gene)~model))
+    summ <- summ$coefficients[contrast,]
+    
+    if (is.na(summ[4])) {
+      pvalue <- NA
+    }
+    else {
+      pvalue <- -log(summ[4])
+      if (summ[3] < 0) {
+        pvalue = (pvalue * -1)
+      }
+    }
+    pvalues <- c(pvalues,pvalue)
+  }
+  pvalues <- data.frame(gene = rownames(data), pvalues = pvalues)
+  pvalues <- na.omit(pvalues)
+  pvalues <- pvalues[order(-pvalues$pvalue),]
+  if (!is.null(output)) {
+    write.table(pvalues, file = output, quote = F, sep = '\t', row.names = F)
+  }
+  else {
+    return (pvalues)
+  }
+}
+
+
+### Performs a simple t-test for each row of matrix
 # |data| is a matrix with genes as rows and samples as columns
 # |group1| and |group2| can be a list of the column names in each group or a vector of bools
 # |paired| is whether to do paired t-test or not
@@ -115,6 +151,7 @@ log_pvalues_from_ttest_adj <- function(data, group1, group2, paired = F, remove.
   log.pvalues <- log.pvalues[order(-log.pvalues$pvalues),]
   return (log.pvalues)
 }
+
 
 ### Takes output from DESeq2 package and generates table of log p-values
 # |data| is the output matrix
